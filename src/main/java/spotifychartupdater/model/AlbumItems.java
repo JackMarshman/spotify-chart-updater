@@ -8,7 +8,7 @@ import java.util.List;
 public class AlbumItems {
 
     public String href;
-    public List<AlbumItem> items;
+    public List<Album> items;
     public int limit;
     public String next;
     public int offset;

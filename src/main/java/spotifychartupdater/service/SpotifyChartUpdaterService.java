@@ -10,10 +10,11 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import spotifychartupdater.config.SpotifyChartUpdaterProperties;
-import spotifychartupdater.model.AccessTokenResponse;
-import spotifychartupdater.model.AlbumQueryResult;
+import spotifychartupdater.model.*;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @Service
@@ -31,6 +32,38 @@ public class SpotifyChartUpdaterService {
     public void generateAccessToken() {
         log.info("Generating access token.");
         this.accessToken = retrieveAccessToken();
+    }
+
+    //TODO - refine.
+    public String retrieveArtistId(List<Artist> artists, String artistName) {
+        String artistId = null;
+
+        for (Artist artist : artists) {
+            if (artist.getName().equals(artistName)) {
+                artistId = artist.getId();
+            }
+        }
+
+        return artistId;
+    }
+
+    //TODO - refine.
+    public Album findValidAlbum(String artistName, String albumName, AlbumItems albumItems) throws Exception {
+        List<Album> albums = albumItems.getItems();
+
+        List<Album> albumsWithCorrectName = albums.stream().filter(album -> album.getName().equals(albumName)).collect(Collectors.toList());
+
+        for (Album album : albumsWithCorrectName) {
+            List<Artist> artists = album.getArtists();
+
+            for (Artist artist : artists) {
+                if (artist.getName().equals(artistName)) {
+                    return album;
+                }
+            }
+        }
+
+        throw new Exception("Cannot find valid album from album query for album: {} by artist: {}.");
     }
 
     private String retrieveAccessToken() {
@@ -60,7 +93,7 @@ public class SpotifyChartUpdaterService {
     }
 
     public AlbumQueryResult retrieveAlbumByArtist(String artistName, String albumName) {
-        log.info("Querying Spotify for album: {} by artist: {}", albumName, artistName);
+        log.info("Querying Spotify for album: {} by artist: {}.", albumName, artistName);
         String url = buildAlbumQueryUrl(artistName, albumName);
         HttpEntity<String> request = buildRetrieveAlbumRequest();
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
