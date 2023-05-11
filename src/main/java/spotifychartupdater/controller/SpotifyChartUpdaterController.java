@@ -17,7 +17,7 @@ public class SpotifyChartUpdaterController {
 
     @GetMapping(value = "/album", produces = MediaType.APPLICATION_JSON_VALUE)
     public AlbumQueryResult album() {
-        return spotifyChartUpdaterService.retrieveAlbumByArtist("JPEGMAFIA", "SCARING THE HOES");
+        return spotifyChartUpdaterService.retrieveAlbumByArtist("Danny Brown", "SCARING THE HOES");
     }
 
     //TODO - Main entry point of application.
