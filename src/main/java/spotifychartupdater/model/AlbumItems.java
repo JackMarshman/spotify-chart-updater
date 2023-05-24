@@ -7,11 +7,11 @@ import java.util.List;
 @Data
 public class AlbumItems {
 
-    public String href;
-    public List<Album> items;
-    public int limit;
-    public String next;
-    public int offset;
-    public String previous;
-    public int total;
+    private String href;
+    private List<Album> items;
+    private int limit;
+    private String next;
+    private int offset;
+    private String previous;
+    private int total;
 }

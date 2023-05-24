@@ -9,11 +9,11 @@ import lombok.Data;
 public class AccessTokenResponse {
 
     @SerializedName("access_token")
-    public String accessToken;
+    private String accessToken;
 
     @SerializedName("token_type")
-    public String tokenType;
+    private String tokenType;
 
     @SerializedName("expires_in")
-    public int expiresIn;
+    private int expiresIn;
 }

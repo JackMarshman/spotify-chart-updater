@@ -12,4 +12,6 @@ public class SpotifyChartUpdaterProperties {
 
     public String clientId;
     public String clientSecret;
+    public String playlistId;
+    public String accessTokenUrl;
 }

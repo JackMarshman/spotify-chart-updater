@@ -1,14 +1,11 @@
 package spotifychartupdater.service;
 
 import com.google.gson.Gson;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import spotifychartupdater.client.SpotifyClient;
 import spotifychartupdater.config.SpotifyChartUpdaterProperties;
 import spotifychartupdater.model.*;
 
@@ -22,16 +19,40 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class SpotifyChartUpdaterService {
 
-    private final RestTemplate restTemplate;
     private final Gson gson;
-    private final SpotifyChartUpdaterProperties spotifyChartUpdaterProperties;
-    private String accessToken;
-    private static final String ACCESS_TOKEN_GRANT_TYPE = "client_credentials";
+    private final SpotifyClient spotifyClient;
 
-    @PostConstruct
-    public void generateAccessToken() {
-        log.info("Generating access token.");
-        this.accessToken = retrieveAccessToken();
+    public Playlist retrievePlaylistById(String playlistId) {
+        log.info("Querying Spotify for playlist with ID: {}.", playlistId);
+        final String url = String.format("https://api.spotify.com/v1/playlists/%s", playlistId);
+        final ResponseEntity<String> response = spotifyClient.retrieveDataFromSpotify(url);
+
+        return gson.fromJson(response.getBody(), Playlist.class);
+    }
+
+    public AlbumQueryResult retrieveAlbumByArtist(String artistName, String albumName) {
+        log.info("Querying Spotify for album: {} by artist: {}.", albumName, artistName);
+        final String url = buildAlbumQueryUrl(artistName, albumName);
+        final ResponseEntity<String> response = spotifyClient.retrieveDataFromSpotify(url);
+
+        return gson.fromJson(response.getBody(), AlbumQueryResult.class);
+    }
+
+    //TODO - only required for any chart entries where lastMonth isn't NEW or RE.
+    //Logic like this is used to determine what queries we need to make to Spotify for new albums.
+    public boolean DoesPlaylistContainChartEntry(Playlist playlist, ChartEntry chartEntry) {
+        final List<TrackItem> playlistTrackItems = playlist.getTracks().getItems();
+
+        return IntStream.range(0, playlistTrackItems.size())
+                .anyMatch(i -> DoesTrackMatchChartEntry(playlistTrackItems.get(i).getTrack(), chartEntry.getAlbumName(), chartEntry.getArtistName()));
+    }
+
+    private boolean DoesTrackMatchChartEntry(Track track, String albumName, String artistName) {
+        return track.getAlbum().getName().equals(albumName) && DoesAlbumArtistsContainArtistName(track.getArtists(), artistName);
+    }
+
+    private boolean DoesAlbumArtistsContainArtistName(List<Artist> artists, String artistName) {
+        return artists.stream().anyMatch(artist -> artist.getName().equals(artistName));
     }
 
     //TODO - refine.
@@ -66,41 +87,6 @@ public class SpotifyChartUpdaterService {
         throw new Exception("Cannot find valid album from album query for album: {} by artist: {}.");
     }
 
-    private String retrieveAccessToken() {
-        HttpEntity<MultiValueMap<String, String>> request = buildAccessTokenRequest();
-        ResponseEntity<String> responseEntity = restTemplate.postForEntity("https://accounts.spotify.com/api/token", request, String.class);
-        AccessTokenResponse response = gson.fromJson(responseEntity.getBody(), AccessTokenResponse.class);
-
-        return response.getAccessToken();
-    }
-
-    private HttpEntity<MultiValueMap<String, String>> buildAccessTokenRequest() {
-        MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
-        requestBody.add("grant_type", ACCESS_TOKEN_GRANT_TYPE);
-        requestBody.add("client_id", spotifyChartUpdaterProperties.getClientId());
-        requestBody.add("client_secret", spotifyChartUpdaterProperties.getClientSecret());
-
-        HttpHeaders requestHeaders = createAccessTokenRequestHeaders();
-
-        return new HttpEntity<>(requestBody, requestHeaders);
-    }
-
-    private HttpHeaders createAccessTokenRequestHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        return headers;
-    }
-
-    public AlbumQueryResult retrieveAlbumByArtist(String artistName, String albumName) {
-        log.info("Querying Spotify for album: {} by artist: {}.", albumName, artistName);
-        String url = buildAlbumQueryUrl(artistName, albumName);
-        HttpEntity<String> request = buildRetrieveAlbumRequest();
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-
-        return gson.fromJson(response.getBody(), AlbumQueryResult.class);
-    }
-
     //should look like this -> artist:Billie%20Marten%20album:Drop%20Cherries
     private String buildAlbumQueryUrl(String artistName, String albumName) {
         String[] artistNameParts = artistName.split(" ");
@@ -128,26 +114,12 @@ public class SpotifyChartUpdaterService {
         return "https://api.spotify.com/v1/search?q=remaster%20" + query + "&type=album&market=GB&limit=1&offset=0";
     }
 
-    private HttpEntity<String> buildRetrieveAlbumRequest() {
-        return new HttpEntity<>(createRetrieveAlbumHeaders());
-    }
-
-    private HttpHeaders createRetrieveAlbumHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", String.format("Bearer %s", accessToken));
-
-        return headers;
-    }
-
-
-
-
     //THIS WORKS DO NOT DELETE.
-    public AlbumQueryResult retrieveAlbumNew() {
-        String url = "https://api.spotify.com/v1/search?q=remaster%20artist:Billie%20Marten%20album:Drop%20Cherries&type=album&market=GB&limit=1&offset=0"; //works, so fkn weird.
-        HttpEntity<String> request = buildRetrieveAlbumRequest();
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-
-        return gson.fromJson(response.getBody(), AlbumQueryResult.class);
-    }
+//    public AlbumQueryResult retrieveAlbumNew() {
+//        String url = "https://api.spotify.com/v1/search?q=remaster%20artist:Billie%20Marten%20album:Drop%20Cherries&type=album&market=GB&limit=1&offset=0"; //works, so fkn weird.
+//        HttpEntity<String> request = buildRetrieveAlbumRequest();
+//        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+//
+//        return gson.fromJson(response.getBody(), AlbumQueryResult.class);
+//    }
 }

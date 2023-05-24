@@ -4,8 +4,9 @@ import lombok.Data;
 
 import java.util.List;
 
+//TODO - potentially restructure this to be more in line with Playlist??
 @Data
 public class AlbumQueryResult {
 
-    public AlbumItems albums;
+    private AlbumItems albums;
 }
